@@ -1,0 +1,222 @@
+UIT2702 - CLOUD AND DISTRIBUTED COMPUTING
+EXERCISE 5 - COMMAND SHEET
+
+TOPICS REQUIRED:
+1. Creating VMs
+2. Load Balancing
+3. Server Consolidation
+4. Fault Tolerance
+
+============================================================
+1. CREATING VIRTUAL MACHINES
+============================================================
+
+STEP 1 - Open VMware Workstation Pro 17
+------------------------------------------------------------
+Open VMware Workstation and start the existing Ubuntu VM.
+
+STEP 2 - Clone the VM
+------------------------------------------------------------
+1. Right-click the existing Ubuntu VM.
+2. Select Manage -> Clone.
+3. Select Create a full clone.
+4. Give the cloned VM a new name.
+5. Repeat to create the required number of VMs.
+
+STEP 3 - Power on the VMs
+------------------------------------------------------------
+Power on each cloned VM and open its terminal.
+
+STEP 4 - Install Apache on each VM
+------------------------------------------------------------
+Run these commands on EACH web-server VM:
+
+sudo apt update
+
+sudo apt install apache2 -y
+
+sudo systemctl enable apache2
+
+sudo systemctl status apache2
+
+Apache should show:
+Active: active (running)
+
+STEP 5 - Find the IP address
+------------------------------------------------------------
+If ifconfig is not available:
+
+sudo apt install net-tools -y
+
+Then:
+
+ifconfig
+
+Record the IP address of each VM:
+
+VM1 IP = ____________________
+VM2 IP = ____________________
+VM3 IP = ____________________
+
+============================================================
+2. LOAD BALANCING
+============================================================
+
+STEP 1 - Install HAProxy
+------------------------------------------------------------
+On the VM that will act as the load balancer:
+
+sudo apt update
+
+sudo apt install haproxy -y
+
+STEP 2 - Open HAProxy configuration
+------------------------------------------------------------
+sudo nano /etc/haproxy/haproxy.cfg
+
+Add:
+
+frontend http_front
+    bind *:80
+    default_backend http_back
+
+backend http_back
+    balance roundrobin
+    server vm1 <VM1_IP>:80 check
+    server vm2 <VM2_IP>:80 check
+    server vm3 <VM3_IP>:80 check
+
+Replace <VM1_IP>, <VM2_IP> and <VM3_IP> with the actual IP
+addresses of your backend VMs.
+
+Save and exit nano:
+
+Ctrl+O
+Enter
+Ctrl+X
+
+STEP 3 - Start HAProxy
+------------------------------------------------------------
+sudo systemctl restart haproxy
+
+sudo systemctl enable haproxy
+
+sudo systemctl status haproxy
+
+Check that it shows:
+Active: active (running)
+
+STEP 4 - Test the load balancer
+------------------------------------------------------------
+Open a browser and enter:
+
+http://<LOAD_BALANCER_IP>
+
+Example:
+http://192.168.119.128
+
+============================================================
+3. SERVER CONSOLIDATION
+============================================================
+
+STEP 1 - Identify VMs
+------------------------------------------------------------
+Open VMware Workstation and review all VMs.
+
+Check:
+- CPU allocation
+- Memory allocation
+- Storage
+- Workload
+
+Identify VMs with low usage or redundant workloads.
+
+STEP 2 - Select a consolidation host
+------------------------------------------------------------
+Choose a VM/host with sufficient CPU, memory and storage.
+
+STEP 3 - Adjust resources
+------------------------------------------------------------
+For a VM:
+1. Select the VM.
+2. Click Edit virtual machine settings.
+3. Adjust Memory and Processor.
+4. Avoid over-provisioning.
+
+STEP 4 - Migrate services
+------------------------------------------------------------
+Move the required files/services from the VM being consolidated
+to the target VM.
+
+Start the services on the target VM and verify that they work.
+
+STEP 5 - Power off unused VMs
+------------------------------------------------------------
+After confirming the services work:
+
+1. Power off the original VM.
+2. Right-click the VM in VMware Workstation.
+3. Select Remove.
+
+STEP 6 - Check resource usage
+------------------------------------------------------------
+Inside the consolidated Ubuntu VM:
+
+top
+
+If htop is installed:
+
+htop
+
+Check CPU and memory usage.
+
+============================================================
+4. FAULT TOLERANCE
+============================================================
+
+STEP 1 - Create a backup VM
+------------------------------------------------------------
+In VMware Workstation:
+
+1. Select the critical/primary VM.
+2. Go to VM -> Manage -> Clone.
+3. Select Full Clone.
+4. Give the backup VM a suitable name.
+5. Complete the clone.
+
+STEP 2 - Synchronize data using rsync
+------------------------------------------------------------
+On the primary VM:
+
+rsync -av /source_directory/ user@<BACKUP_VM_IP>:/destination_directory
+
+Replace the placeholders with your actual values.
+
+Example:
+
+rsync -av /var/www/html/ user@192.168.119.131:/var/www/html/
+
+STEP 3 - Create a VMware snapshot
+------------------------------------------------------------
+In VMware Workstation:
+
+1. Select the critical VM.
+2. Go to VM -> Snapshot -> Take Snapshot.
+3. Give it a name such as:
+   Pre-Consolidation Snapshot
+4. Take snapshots before major changes.
+
+============================================================
+FINAL CHECK
+============================================================
+
+[ ] VMs created/cloned
+[ ] Apache installed
+[ ] VM IP addresses identified
+[ ] HAProxy installed
+[ ] HAProxy configured
+[ ] Load balancer tested
+[ ] Server consolidation completed
+[ ] Backup VM created
+[ ] rsync tested
+[ ] VMware snapshot created

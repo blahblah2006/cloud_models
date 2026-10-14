@@ -1,0 +1,112 @@
+UIT2702 - CLOUD AND DISTRIBUTED COMPUTING
+EXERCISE 6 - COMMAND SHEET
+
+TOPIC REQUIRED:
+TASK SCHEDULING ONLY
+
+============================================================
+TASK SCHEDULING USING CRON
+============================================================
+
+STEP 1 - Open the Ubuntu VM
+------------------------------------------------------------
+Open VMware Workstation Pro 17.
+
+Power on the Ubuntu VM and open its terminal.
+
+STEP 2 - Create the script
+------------------------------------------------------------
+Run:
+
+nano script.sh
+
+Enter:
+
+#!/bin/bash
+echo "Hello Selcia" >> ./output.log
+
+Save the file:
+
+Ctrl+O
+Enter
+Ctrl+X
+
+STEP 3 - Make the script executable
+------------------------------------------------------------
+chmod +x script.sh
+
+STEP 4 - Test the script manually
+------------------------------------------------------------
+Run:
+
+./script.sh
+
+Check the output:
+
+cat output.log
+
+Expected:
+
+Hello Selcia
+
+STEP 5 - Open the cron configuration
+------------------------------------------------------------
+Run:
+
+crontab -e
+
+If asked to choose an editor, select nano.
+
+STEP 6 - Add the scheduled task
+------------------------------------------------------------
+Add:
+
+*/1 * * * * ./script.sh >> ./output.log
+
+This runs the script once every minute.
+
+Save and exit:
+
+Ctrl+O
+Enter
+Ctrl+X
+
+STEP 7 - Wait and verify
+------------------------------------------------------------
+Wait for at least 1-2 minutes.
+
+Then run:
+
+cat output.log
+
+Expected output will contain repeated lines:
+
+Hello Selcia
+Hello Selcia
+
+STEP 8 - Check cron activity
+------------------------------------------------------------
+Run:
+
+tail -f /var/log/syslog | grep CRON
+
+This shows cron activity as the scheduled job runs.
+
+Press:
+
+Ctrl+C
+
+to stop the command.
+
+============================================================
+FINAL CHECK
+============================================================
+
+[ ] Ubuntu VM powered on
+[ ] script.sh created
+[ ] Script tested manually
+[ ] Script made executable
+[ ] crontab opened
+[ ] Cron job added
+[ ] output.log checked
+[ ] Cron execution verified

@@ -1,0 +1,148 @@
+TASK SCHEDULING WITH CLOUD SERVICES
+====================================
+
+VMware + Ubuntu/Linux
+
+1. Check Python
+----------------
+python3 --version
+
+If Python is not installed:
+sudo apt update
+sudo apt install python3 python3-pip -y
+
+
+2. Install Redis
+----------------
+sudo apt update
+sudo apt install redis-server -y
+
+Start Redis:
+sudo systemctl start redis
+
+Check Redis:
+redis-cli ping
+
+Output:
+PONG
+
+
+3. Install Celery
+-----------------
+pip3 install celery redis
+
+If you get an externally-managed-environment error:
+
+python3 -m venv venv
+source venv/bin/activate
+pip install celery redis
+
+
+4. Create Python File
+---------------------
+nano app.py
+
+Paste this code:
+
+from celery import Celery
+
+app = Celery("app", broker="redis://localhost:6379/0")
+
+@app.task
+def task():
+    print("Task executed")
+
+app.conf.beat_schedule = {
+    "run-task": {
+        "task": "app.task",
+        "schedule": 60.0
+    }
+}
+
+Save:
+Ctrl + O
+Enter
+Ctrl + X
+
+
+5. Start Celery Worker
+----------------------
+Open Terminal 1.
+
+Go to the folder containing app.py:
+
+cd ~
+
+If using virtual environment:
+source venv/bin/activate
+
+Run:
+
+celery -A app worker --loglevel=info
+
+Keep this terminal open.
+
+
+6. Start Celery Scheduler
+-------------------------
+Open Terminal 2.
+
+Go to the same folder:
+
+cd ~
+
+If using virtual environment:
+source venv/bin/activate
+
+Run:
+
+celery -A app beat --loglevel=info
+
+
+7. Expected Output
+------------------
+Scheduler terminal:
+
+Scheduler: Sending due task run-task
+
+Worker terminal:
+
+Task app.task received
+Task executed
+Task app.task succeeded
+
+The task will run every 60 seconds.
+
+
+HOW IT WORKS
+------------
+
+Redis  -> Message Broker
+Celery Worker -> Executes the task
+Celery Beat -> Schedules the task
+
+Flow:
+
+Celery Beat
+    |
+    v
+  Redis
+    |
+    v
+Celery Worker
+    |
+    v
+Task Executed
+
+
+LAB DEMONSTRATION COMMANDS
+---------------------------
+
+Terminal 1:
+redis-cli ping
+
+Terminal 2:
+celery -A app worker --loglevel=info
+
+Terminal 3:
+celery -A app beat --loglevel=info
