@@ -1,0 +1,239 @@
+# =====================================================================
+#  VM (VMware + Ubuntu) - ALL 7 QUESTIONS IN ONE FILE (COMMENTS ONLY)
+# =====================================================================
+#  Everything below is a comment. Copy the commands into the Ubuntu
+#  terminal of the VM named in each step.
+#
+#  STANDARD SETUP USED IN ALL QUESTIONS  (3 VMs)
+#  ---------------------------------------------------------------
+#    VM1 = LOAD BALANCER   (HAProxy)           e.g. IP 192.168.136.10
+#    VM2 = WEB SERVER 1    (Apache)            e.g. IP 192.168.136.11
+#    VM3 = WEB SERVER 2    (Apache)            e.g. IP 192.168.136.12
+#  (Your IPs will be different. Find them with:  ip a   or   hostname -I)
+#
+#  VMware network setting for ALL VMs:
+#    VM > Settings > Network Adapter > "NAT" (or "Bridged").
+#    All VMs MUST use the SAME network type so they can see each other.
+#
+#  How to create a VM (do this once, then clone):
+#    1. VMware > File > New Virtual Machine > choose the Ubuntu ISO.
+#    2. Give it 1-2 GB RAM, 1-2 CPU, 20 GB disk, finish the install.
+#    3. Right-click the finished VM > Manage > Clone > "Full clone"
+#       -> make VM2 and VM3 as clones. Rename them VM1, VM2, VM3.
+#    4. On every VM run:  sudo apt update
+#
+# =====================================================================
+#  COMMON STEP A - Install the web server on VM2 and VM3
+# =====================================================================
+#  On VM2:
+#      sudo apt install apache2 -y
+#      echo "<h1>Hello from VM2 (Server 1)</h1>" | sudo tee /var/www/html/index.html
+#      sudo systemctl enable --now apache2
+#  On VM3:
+#      sudo apt install apache2 -y
+#      echo "<h1>Hello from VM3 (Server 2)</h1>" | sudo tee /var/www/html/index.html
+#      sudo systemctl enable --now apache2
+#  Test from VM1:   curl http://<VM2-IP>      and      curl http://<VM3-IP>
+#
+# =====================================================================
+#  COMMON STEP B - Install and configure the load balancer on VM1
+# =====================================================================
+#  On VM1:
+#      sudo apt install haproxy -y
+#      sudo nano /etc/haproxy/haproxy.cfg
+#  Go to the END of the file and add these lines (replace the IPs):
+#
+#      frontend web_front
+#          bind *:80
+#          default_backend web_servers
+#
+#      backend web_servers
+#          balance roundrobin                  # take turns: VM2, VM3, VM2, VM3 ...
+#          option httpchk GET /                # health check = fault tolerance
+#          server vm2 <VM2-IP>:80 check        # 'check' = test if server is alive
+#          server vm3 <VM3-IP>:80 check
+#
+#  Save (Ctrl+O, Enter) and exit (Ctrl+X). Then:
+#      sudo haproxy -c -f /etc/haproxy/haproxy.cfg      # checks config syntax
+#      sudo systemctl restart haproxy
+#      sudo systemctl enable haproxy
+#
+#  Test the load balancing (run on VM1 or on the host browser):
+#      curl http://<VM1-IP>      <- run it 4-6 times
+#  Output alternates between "Hello from VM2" and "Hello from VM3".
+#  That is LOAD BALANCING.
+#
+#  Test the fault tolerance:
+#      On VM2:   sudo systemctl stop apache2     (VM2 "fails")
+#      On VM1:   curl http://<VM1-IP>            <- run it many times
+#  Every reply now comes from VM3 only, and the user sees NO error.
+#  HAProxy detected VM2 is down (health check) and stopped sending to it.
+#      On VM2:   sudo systemctl start apache2    (VM2 recovers)
+#  HAProxy automatically starts using VM2 again.
+#  Optional status page: add to haproxy.cfg
+#      listen stats
+#          bind *:8404
+#          stats enable
+#          stats uri /stats
+#  and open  http://<VM1-IP>:8404/stats  in a browser (green = UP, red = DOWN).
+#
+# =====================================================================
+#  Q1. LOAD BALANCING AND FAULT TOLERANCE
+# =====================================================================
+#  What to do on each VM:
+#    VM1 (Load Balancer): Common Step B  - HAProxy, "balance roundrobin",
+#                         "check" on every server line.
+#    VM2 (Server 1)     : Common Step A  - Apache showing "Hello from VM2".
+#    VM3 (Server 2)     : Common Step A  - Apache showing "Hello from VM3".
+#  Demonstration (write this in the exam):
+#    1. curl <VM1-IP> several times  -> replies alternate VM2, VM3
+#       (load is shared equally = load balancing).
+#    2. Stop apache2 on VM2          -> all replies come from VM3
+#       (system keeps working = fault tolerance).
+#    3. Start apache2 on VM2 again   -> replies alternate again.
+#
+# =====================================================================
+#  Q2. SCHOOL FEE PORTAL APPLICATION - LOAD BALANCING AND FAULT TOLERANCE
+# =====================================================================
+#  Same 3-VM setup. Only the web page changes.
+#    VM1 (Load Balancer): Common Step B (unchanged).
+#    VM2 (Fee Server 1) : after Common Step A, create the fee page:
+#        sudo tee /var/www/html/index.html <<'EOF'
+#        <h1>School Fee Portal - Server 1 (VM2)</h1>
+#        <form>
+#          Student Name: <input type="text"><br>
+#          Roll No: <input type="text"><br>
+#          Fee Amount: <input type="number"><br>
+#          <button type="button" onclick="alert('Fee paid successfully')">Pay Fee</button>
+#        </form>
+#        EOF
+#    VM3 (Fee Server 2) : same page, but title "Server 2 (VM3)".
+#  Demonstration:
+#    - Open  http://<VM1-IP>  in the browser, press F5 many times:
+#      the title switches between Server 1 and Server 2 (load balancing).
+#    - sudo systemctl stop apache2 on VM2 -> the fee portal still opens,
+#      served by VM3 (fault tolerance). Start it again afterwards.
+#
+# =====================================================================
+#  Q3. SERVER CONSOLIDATION (physical -> virtual; do the LOGICAL version)
+# =====================================================================
+#  Meaning: Instead of running many services on many separate PHYSICAL
+#  servers (each mostly idle), run them as separate VMs on ONE physical
+#  machine. Result: fewer machines, less power/space/cost, higher
+#  utilisation of the one machine.
+#  LOGICAL consolidation (what you do in VMware):
+#    Your laptop = the ONE physical server (the host).
+#    1. Create 3 VMs on this one laptop, each acting as a "former server":
+#         VM-A : Web server       -> sudo apt install apache2 -y
+#         VM-B : Database server  -> sudo apt install mysql-server -y
+#         VM-C : File server      -> sudo apt install samba -y
+#       (Use small sizes: 1 CPU, 1 GB RAM each.)
+#    2. Start all three VMs at the same time.
+#    3. Show that they are isolated but share the same hardware:
+#         On each VM run:   hostname -I        (each has its own IP)
+#                           systemctl status apache2   (or mysql / smbd)
+#    4. Show the resource usage on the host (Windows Task Manager >
+#       Performance): CPU/RAM of ONE machine is shared by 3 servers.
+#    5. Conclusion to write: "3 physical servers were consolidated onto 1
+#       physical host using 3 VMs, which improves hardware utilisation
+#       and reduces cost, space and power."
+#  Extra (optional): VM > Snapshot > Take Snapshot to show easy backup.
+#
+# =====================================================================
+#  Q4. SCHOOL EXAM PORTAL - LOAD BALANCING
+# =====================================================================
+#  Same 3-VM setup, only load balancing is required (fault tolerance is
+#  optional, keep "check" anyway).
+#    VM1 (Load Balancer): Common Step B.
+#        For exam traffic you may use "balance leastconn" instead of
+#        roundrobin (sends new students to the server with fewer users).
+#    VM2 (Exam Server 1): after Common Step A:
+#        echo "<h1>School Exam Portal - Server 1</h1><p>Login and take exam</p>" \
+#          | sudo tee /var/www/html/index.html
+#    VM3 (Exam Server 2): same, with "Server 2".
+#  Demonstration:
+#    - Open http://<VM1-IP> from different browser tabs / run
+#        for i in 1 2 3 4 5 6; do curl -s http://<VM1-IP>; done
+#      Requests are shared between Server 1 and Server 2.
+#
+# =====================================================================
+#  Q5. CREATE MULTIPLE VMs AND MAKE THEM COMMUNICATE USING THEIR IP ADDRESSES
+# =====================================================================
+#  Step 1. Create VM1 and VM2 (clone) with the SAME network type (NAT or
+#          Bridged) in VMware network adapter settings.
+#  Step 2. Find each VM's IP:
+#              VM1:   hostname -I        e.g. 192.168.136.10
+#              VM2:   hostname -I        e.g. 192.168.136.11
+#  Step 3. Check the connection (ping):
+#              VM1:   ping -c 4 192.168.136.11
+#              VM2:   ping -c 4 192.168.136.10
+#          "0% packet loss" means the VMs can communicate.
+#  Step 4. (Optional) Send a real message between the VMs with netcat:
+#              VM2 (receiver):  nc -l 5000
+#              VM1 (sender)  :  echo "Hello VM2" | nc 192.168.136.11 5000
+#          "Hello VM2" appears on VM2.
+#  Step 5. (Optional) Remote login with SSH:
+#              VM2:  sudo apt install openssh-server -y
+#              VM1:  ssh <username-of-VM2>@192.168.136.11
+#  If ping fails: check both VMs use the same network type, and run
+#      sudo ufw disable      (turns off the firewall for the demo).
+#
+# =====================================================================
+#  Q6. ONLINE EXAMINATION PORTAL - LOAD BALANCING AND FAULT TOLERANCE
+# =====================================================================
+#  Same 3-VM setup as Q1/Q2, page changed to an exam page.
+#    VM1 (Load Balancer): Common Step B
+#        (balance roundrobin + "check" + optional stats page).
+#    VM2 (Exam Server 1): after Common Step A:
+#        sudo tee /var/www/html/index.html <<'EOF'
+#        <h1>Online Examination Portal - Server 1 (VM2)</h1>
+#        <p>Q1. Which protocol is used for the web?</p>
+#        <input type="radio"> HTTP &nbsp; <input type="radio"> FTP<br>
+#        <button type="button" onclick="alert('Exam submitted')">Submit</button>
+#        EOF
+#    VM3 (Exam Server 2): same page, title "Server 2 (VM3)".
+#  Demonstration:
+#    - Load balancing : refresh http://<VM1-IP>; page alternates 1 <-> 2.
+#    - Fault tolerance: stop apache2 on VM2 in the middle of the exam;
+#      students still reach the portal through VM3, no downtime.
+#      Start apache2 on VM2 again to recover.
+#
+# =====================================================================
+#  Q7. CLIENT-SERVER COMMUNICATION AND LOAD BALANCER
+# =====================================================================
+#  Here the client talks to a real TCP SERVER (Python socket program)
+#  through the load balancer.
+#    VM2 and VM3 = SERVERS     VM1 = LOAD BALANCER     (client = VM1 or host)
+#  Step 1. On VM2 and VM3 create the server program server.py:
+#        import socket
+#        srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#        srv.bind(("0.0.0.0", 5000)); srv.listen(5)
+#        name = socket.gethostname()                  # shows which VM replied
+#        while True:
+#            conn, addr = srv.accept()
+#            msg = conn.recv(1024).decode()
+#            conn.send(("Reply from " + name + " : got '" + msg + "'").encode())
+#            conn.close()
+#      Run it on BOTH VM2 and VM3:   python3 server.py
+#  Step 2. On VM1 install HAProxy (sudo apt install haproxy -y) and add
+#          to /etc/haproxy/haproxy.cfg :
+#        frontend tcp_front
+#            bind *:5000
+#            mode tcp
+#            default_backend tcp_servers
+#        backend tcp_servers
+#            mode tcp
+#            balance roundrobin
+#            server vm2 <VM2-IP>:5000 check
+#            server vm3 <VM3-IP>:5000 check
+#      sudo systemctl restart haproxy
+#  Step 3. Client (run on VM1, or any machine that can reach VM1):
+#        python3 client.py   where client.py is:
+#            import socket
+#            c = socket.socket(); c.connect(("<VM1-IP>", 5000))
+#            c.send(b"Hello Server"); print(c.recv(1024).decode()); c.close()
+#      Run the client 4-6 times: replies come alternately from VM2 and
+#      VM3's hostname = load balancing. Stop server.py on VM2 (Ctrl+C):
+#      every reply comes from VM3 = fault tolerance.
+#
+# ------------------------- END OF VM SOLUTIONS -------------------------
